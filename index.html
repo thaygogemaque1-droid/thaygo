@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Extração de Notas Fiscais</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+        }
+        
+        h1 {
+            color: #6366f1;
+            text-align: center;
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #64748b;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        
+        .upload-section {
+            background: #f0f9ff;
+            border: 3px solid #6366f1;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 25px;
+        }
+        
+        .upload-section h2 {
+            color: #6366f1;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .file-input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #6366f1;
+            border-radius: 8px;
+            font-size: 16px;
+            background: white;
+            margin-bottom: 15px;
+        }
+        
+        #fileInfo {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            display: none;
+        }
+        
+        #fileInfo.show {
+            display: block;
+        }
+        
+        .buttons {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px;
+            color: white;
+        }
+        
+        .btn-success {
+            background: #10b981;
+        }
+        
+        .btn-danger {
+            background: #ef4444;
+        }
+        
+        .btn-info {
+            background: #3b82f6;
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .btn:hover:not(:disabled) {
+            opacity: 0.9;
+        }
+        
+        #progressArea {
+            margin: 25px 0;
+            display: none;
+        }
+        
+        #progressArea.show {
+            display: block;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 35px;
+            background: #e5e7eb;
+            border-radius: 17px;
+            overflow: hidden;
+            margin-bottom: 12px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #6366f1, #8b5cf6);
+            width: 0%;
+            transition: width 0.5s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .progress-text {
+            text-align: center;
+            font-weight: bold;
+            color: #1e293b;
+        }
+        
+        #formSection {
+            background: #f8fafc;
+            padding: 25px;
+            border-radius: 12px;
+            margin: 25px 0;
+            display: none;
+        }
+        
+        #formSection.show {
+            display: block;
+        }
+        
+        .section-title {
+            color: #6366f1;
+            font-size: 1.4em;
+            margin: 20px 0 15px 0;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #6366f1;
+        }
+        
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 6px;
+            color: #1e293b;
+        }
+        
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 15px;
+        }
+        
+        .form-group textarea {
+            min-height: 80px;
+            font-family: inherit;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: white;
+        }
+        
+        thead {
+            background: #6366f1;
+            color: white;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        tbody tr:hover {
+            background: #f8fafc;
+        }
+        
+        .btn-delete {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 8px;
+            color: white;
+            font-weight: bold;
+            z-index: 10000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            animation: slideIn 0.3s;
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateX(400px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        .notification.success { background: #10b981; }
+        .notification.error { background: #ef4444; }
+        .notification.info { background: #3b82f6; }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+            
+            h1 {
+                font-size: 1.5em;
+            }
+            
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏢 Sistema de Extração de Notas Fiscais</h1>
+        <p class="subtitle">Processamento automático de PDF e Imagens com OCR</p>
+
+        <div class="upload-section">
+            <h2>📤 Selecione a Nota Fiscal</h2>
+            <input type="file" class="file-input" id="fileInput" accept=".pdf,.jpg,.jpeg,.png">
+            
+            <div id="fileInfo">
+                <p id="fileName" style="font-weight:bold; color:#10b981;"></p>
+                <p id="fileSize" style="color:#64748b;"></p>
+            </div>
+            
+            <div class="buttons">
+                <button class="btn btn-success" id="btnProcessar" disabled>🚀 PROCESSAR E EXTRAIR</button>
+                <button class="btn btn-danger" id="btnLimpar">🗑️ Limpar</button>
+            </div>
+        </div>
+
+        <div id="progressArea">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill">0%</div>
+            </div>
+            <p class="progress-text" id="progressText">Processando...</p>
+        </div>
+
+        <div id="formSection">
+            <h2 class="section-title">📋 Dados Extraídos da Nota Fiscal</h2>
+            
+            <form id="mainForm">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Nº Patrimônio</label>
+                        <input type="text" name="numeroPatrimonio">
+                    </div>
+                    <div class="form-group">
+                        <label>NF Número</label>
+                        <input type="text" name="nfNumero">
+                    </div>
+                    <div class="form-group">
+                        <label>Série NF</label>
+                        <input type="text" name="serie">
+                    </div>
+                    <div class="form-group">
+                        <label>Data Emissão</label>
+                        <input type="date" name="dataEmissao">
+                    </div>
+                </div>
+
+                <h3 class="section-title">🏪 Fornecedor</h3>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Razão Social</label>
+                        <input type="text" name="fornecedor">
+                    </div>
+                    <div class="form-group">
+                        <label>CNPJ</label>
+                        <input type="text" name="cnpj">
+                    </div>
+                </div>
+
+                <h3 class="section-title">📦 Produto/Serviço</h3>
+                <div class="form-group">
+                    <label>Descrição</label>
+                    <textarea name="descricao"></textarea>
+                </div>
+                
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Quantidade</label>
+                        <input type="number" name="quantidade" value="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Unidade</label>
+                        <input type="text" name="unidade" value="UN">
+                    </div>
+                    <div class="form-group">
+                        <label>Valor Unitário (R$)</label>
+                        <input type="number" step="0.01" name="valorUnitario">
+                    </div>
+                    <div class="form-group">
+                        <label>Valor Total (R$)</label>
+                        <input type="number" step="0.01" name="valorTotal">
+                    </div>
+                </div>
+
+                <h3 class="section-title">📋 Dados Fiscais</h3>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>NCM</label>
+                        <input type="text" name="ncm">
+                    </div>
+                    <div class="form-group">
+                        <label>CFOP</label>
+                        <input type="text" name="cfop">
+                    </div>
+                    <div class="form-group">
+                        <label>CST</label>
+                        <input type="text" name="cst">
+                    </div>
+                    <div class="form-group">
+                        <label>Valor ICMS (R$)</label>
+                        <input type="number" step="0.01" name="valorICMS">
+                    </div>
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Valor IPI (R$)</label>
+                        <input type="number" step="0.01" name="valorIPI">
+                    </div>
+                    <div class="form-group">
+                        <label>Valor PIS (R$)</label>
+                        <input type="number" step="0.01" name="valorPIS">
+                    </div>
+                    <div class="form-group">
+                        <label>Valor COFINS (R$)</label>
+                        <input type="number" step="0.01" name="valorCOFINS">
+                    </div>
+                </div>
+
+                <h3 class="section-title">🔑 Identificação</h3>
+                <div class="form-group">
+                    <label>Chave de Acesso NFe (44 dígitos)</label>
+                    <input type="text" name="chave" maxlength="44">
+                </div>
+
+                <h3 class="section-title">🏢 Dados Patrimoniais</h3>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Grupo</label>
+                        <select name="grupo">
+                            <option value="">Selecione...</option>
+                            <option value="Equipamentos TI">Equipamentos TI</option>
+                            <option value="Móveis e Utensílios">Móveis e Utensílios</option>
+                            <option value="Veículos">Veículos</option>
+                            <option value="Máquinas">Máquinas</option>
+                            <option value="Ferramentas">Ferramentas</option>
+                            <option value="Outros">Outros</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Localização</label>
+                        <input type="text" name="localizacao">
+                    </div>
+                    <div class="form-group">
+                        <label>Responsável</label>
+                        <input type="text" name="responsavel">
+                    </div>
+                    <div class="form-group">
+                        <label>Situação</label>
+                        <select name="situacao">
+                            <option value="Em uso">Em uso</option>
+                            <option value="Disponível">Disponível</option>
+                            <option value="Manutenção">Manutenção</option>
+                            <option value="Descartado">Descartado</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Observações</label>
+                    <textarea name="observacoes" rows="3"></textarea>
+                </div>
+
+                <div class="buttons">
+                    <button type="submit" class="btn btn-success">💾 SALVAR REGISTRO</button>
+                </div>
+            </form>
+        </div>
+
+        <div id="relatorios">
+            <h2 class="section-title">📊 Registros Salvos</h2>
+            <div style="overflow-x:auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Patrimônio</th>
+                            <th>NF</th>
+                            <th>Fornecedor</th>
+                            <th>Valor Total</th>
+                            <th>Data</th>
+                            <th>Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody">
+                        <tr>
+                            <td colspan="6" style="text-align:center; padding:30px; color:#64748b;">
+                                Nenhum registro ainda
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="buttons">
+                <button class="btn btn-success" id="btnExportar">📊 Exportar Excel</button>
+                <button class="btn btn-info" id="btnBackup">💾 Backup JSON</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configurar PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        // Desabilitar warnings do console
+        var originalWarn = console.warn;
+        console.warn = function(msg) {
+            if (typeof msg === 'string' && msg.includes('fake worker')) {
+                return;
+            }
+            originalWarn.apply(console, arguments);
+        };
+
+        var arquivo = null;
+        var registros = [];
+        var schedulerWorker = null;
+
+        var fileInput = document.getElementById('fileInput');
+        var btnProcessar = document.getElementById('btnProcessar');
+        var btnLimpar = document.getElementById('btnLimpar');
+        var btnExportar = document.getElementById('btnExportar');
+        var btnBackup = document.getElementById('btnBackup');
+        var mainForm = document.getElementById('mainForm');
+
+        fileInput.onchange = function() {
+            arquivo = this.files[0];
+            
+            if (!arquivo) return;
+
+            var tipos = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+            if (tipos.indexOf(arquivo.type) === -1) {
+                notificar('Formato inválido! Use PDF, JPG ou PNG', 'error');
+                this.value = '';
+                return;
+            }
+
+            if (arquivo.size > 10485760) {
+                notificar('Arquivo muito grande! Máximo 10MB', 'error');
+                this.value = '';
+                return;
+            }
+
+            document.getElementById('fileInfo').className = 'show';
+            document.getElementById('fileName').textContent = '✅ ' + arquivo.name;
+            document.getElementById('fileSize').textContent = 'Tamanho: ' + (arquivo.size/1024).toFixed(2) + ' KB';
+            btnProcessar.disabled = false;
+            
+            notificar('Arquivo selecionado!', 'success');
+        };
+
+        btnLimpar.onclick = function() {
+            arquivo = null;
+            fileInput.value = '';
+            document.getElementById('fileInfo').className = '';
+            btnProcessar.disabled = true;
+            notificar('Limpou!', 'info');
+        };
+
+        btnProcessar.onclick = processar;
+        btnExportar.onclick = exportarExcel;
+        btnBackup.onclick = exportarJSON;
+        mainForm.onsubmit = salvar;
+
+        function progresso(valor, texto) {
+            var area = document.getElementById('progressArea');
+            area.className = 'show';
+            document.getElementById('progressFill').style.width = valor + '%';
+            document.getElementById('progressFill').textContent = valor + '%';
+            document.getElementById('progressText').textContent = texto;
+        }
+
+        async function processar() {
+            if (!arquivo) {
+                notificar('Selecione um arquivo!', 'error');
+                return;
+            }
+
+            btnProcessar.disabled = true;
+            progresso(0, 'Iniciando...');
+
+            try {
+                var texto = '';
+
+                if (arquivo.type === 'application/pdf') {
+                    progresso(20, 'Lendo PDF...');
+                    texto = await lerPDF();
+                } else {
+                    progresso(20, 'Processando imagem com OCR...');
+                    texto = await lerImagem();
+                }
+
+                console.log('Texto extraído:', texto);
+
+                progresso(60, 'Extraindo dados...');
+                var dados = extrair(texto);
+
+                progresso(80, 'Preenchendo formulário...');
+                preencher(dados);
+
+                progresso(100, 'Concluído!');
+                
+                setTimeout(function() {
+                    document.getElementById('progressArea').className = '';
+                    document.getElementById('formSection').className = 'show';
+                    document.getElementById('formSection').scrollIntoView({ behavior: 'smooth' });
+                }, 1500);
+
+                notificar('✅ Dados extraídos!', 'success');
+
+            } catch (e) {
+                console.error('Erro:', e);
+                notificar('❌ Erro: ' + e.message, 'error');
+                document.getElementById('progressArea').className = '';
+                btnProcessar.disabled = false;
+            }
+        }
+
+        async function lerPDF() {
+            var buffer = await arquivo.arrayBuffer();
+            var pdf = await pdfjsLib.getDocument({data: buffer}).promise;
+            var texto = '';
+
+            for (var i = 1; i <= pdf.numPages; i++) {
+                var pagina = await pdf.getPage(i);
+                var conteudo = await pagina.getTextContent();
+                for (var j = 0; j < conteudo.items.length; j++) {
+                    texto += conteudo.items[j].str + ' ';
+                }
+                texto += '\n';
+            }
+
+            return texto;
+        }
+
+        async function lerImagem() {
+            if (!schedulerWorker) {
+                progresso(25, 'Inicializando OCR...');
+                schedulerWorker = await Tesseract.createWorker('por', 1, {
+                    logger: function() {}
+                });
+            }
+
+            progresso(40, 'Reconhecendo texto...');
+            var resultado = await schedulerWorker.recognize(arquivo);
+            return resultado.data.text;
+        }
+
+        function extrair(texto) {
+            texto = texto.toUpperCase();
+            
+            var nf = texto.match(/N[FO]*\s*[:.\s]*(\d{3,12})/i);
+            var serie = texto.match(/S[EÉ]RIE\s*[:.\s]*([A-Z0-9]{1,5})/i);
+            var data = texto.match(/(\d{2}[\/\-\.]\d{2}[\/\-\.]\d{4})/);
+            var fornecedor = texto.match(/(?:EMITENTE|RAZ[AÃ]O)[:\s]*([^\n]{10,150})/i);
+            var cnpj = texto.match(/(\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})/);
+            var descricao = texto.match(/(?:DESCRI[CÇ][AÃ]O|PRODUTO)[:\s]*([^\n]{10,300})/i);
+            var quantidade = texto.match(/(?:QT|QUANTIDADE)[:\s]*(\d+)/i);
+            var ncm = texto.match(/NCM[:\s]*(\d{4}\.?\d{2}\.?\d{2})/i);
+            var cfop = texto.match(/CFOP[:\s]*(\d{4})/i);
+            var cst = texto.match(/CST[:\s]*(\d{2,3})/i);
+            var chave = texto.match(/(\d{4}\s*\d{4}\s*\d{4}\s*\d{4}\s*\d{4}\s*\d{4}\s*\d{4}\s*\d{4}\s*\d{4}\s*\d{4}\s*\d{4})/);
+            
+            var valores = texto.match(/\d{1,10}[.,]\d{2}/g);
+            var maior = 0;
+            if (valores) {
+                for (var i = 0; i < valores.length; i++) {
+                    var v = parseFloat(valores[i].replace('.','').replace(',','.'));
+                    if (v > maior) maior = v;
+                }
+            }
+
+            var icms = texto.match(/ICMS[:\s]*R?\$?\s*(\d+[.,]\d{2})/i);
+            var ipi = texto.match(/IPI[:\s]*R?\$?\s*(\d+[.,]\d{2})/i);
+            var pis = texto.match(/PIS[:\s]*R?\$?\s*(\d+[.,]\d{2})/i);
+            var cofins = texto.match(/COFINS[:\s]*R?\$?\s*(\d+[.,]\d{2})/i);
+
+            return {
+                nfNumero: nf ? nf[1] : '',
+                serie: serie ? serie[1] : '',
+                dataEmissao: data ? formatarData(data[1]) : '',
+                fornecedor: fornecedor ? fornecedor[1].trim() : '',
+                cnpj: cnpj ? formatarCNPJ(cnpj[1]) : '',
+                descricao: descricao ? descricao[1].trim() : '',
+                quantidade: quantidade ? quantidade[1] : '1',
+                unidade: 'UN',
+                valorUnitario: maior > 0 ? maior.toFixed(2) : '',
+                valorTotal: maior > 0 ? maior.toFixed(2) : '',
+                ncm: ncm ? ncm[1] : '',
+                cfop: cfop ? cfop[1] : '',
+                cst: cst ? cst[1] : '',
+                valorICMS: icms ? icms[1].replace(',', '.') : '',
+                valorIPI: ipi ? ipi[1].replace(',', '.') : '',
+                valorPIS: pis ? pis[1].replace(',', '.') : '',
+                valorCOFINS: cofins ? cofins[1].replace(',', '.') : '',
+                chave: chave ? chave[1].replace(/\s/g, '') : ''
+            };
+        }
+
+        function formatarData(d) {
+            var p = d.split(/[\/\-\.]/);
+            return p[2] + '-' + p[1] + '-' + p[0];
+        }
+
+        function formatarCNPJ(c) {
+            c = c.replace(/\D/g, '');
+            return c.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+        }
+
+        function preencher(dados) {
+            var inputs = mainForm.getElementsByTagName('input');
+            var textareas = mainForm.getElementsByTagName('textarea');
+            
+            for (var i = 0; i < inputs.length; i++) {
+                var nome = inputs[i].name;
+                if (dados[nome]) inputs[i].value = dados[nome];
+            }
+            
+            for (var i = 0; i < textareas.length; i++) {
+                var nome = textareas[i].name;
+                if (dados[nome]) textareas[i].value = dados[nome];
+            }
+            
+            var patrimonioInput = mainForm.querySelector('[name="numeroPatrimonio"]');
+            if (patrimonioInput && !patrimonioInput.value) {
+                patrimonioInput.value = 'PAT-' + Date.now().toString().slice(-8);
+            }
+        }
+
+        function salvar(e) {
+            e.preventDefault();
+            
+            var dados = {};
+            var inputs = mainForm.getElementsByTagName('input');
+            var textareas = mainForm.getElementsByTagName('textarea');
+            var selects = mainForm.getElementsByTagName('select');
+            
+            for (var i = 0; i < inputs.length; i++) {
+                dados[inputs[i].name] = inputs[i].value;
+            }
+            
+            for (var i = 0; i < textareas.length; i++) {
+                dados[textareas[i].name] = textareas[i].value;
+            }
+            
+            for (var i = 0; i < selects.length; i++) {
+                dados[selects[i].name] = selects[i].value;
+            }
+            
+            dados.dataCadastro = new Date().toISOString();
+            registros.push(dados);
+            localStorage.setItem('registros', JSON.stringify(registros));
+            
+            atualizar();
+            mainForm.reset();
+            fileInput.value = '';
+            arquivo = null;
+            btnProcessar.disabled = true;
+            document.getElementById('fileInfo').className = '';
+            document.getElementById('formSection').className = '';
+            
+            notificar('✅ Registro salvo!', 'success');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function atualizar() {
+            var tbody = document.getElementById('tbody');
+            
+            if (registros.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:30px; color:#64748b;">Nenhum registro ainda</td></tr>';
+                return;
+            }
+            
+            var html = '';
+            for (var i = 0; i < registros.length; i++) {
+                var r = registros[i];
+                html += '<tr>';
+                html += '<td><strong>' + (r.numeroPatrimonio || '-') + '</strong></td>';
+                html += '<td>' + (r.nfNumero || '-') + '</td>';
+                html += '<td>' + (r.fornecedor || '-').substring(0,30) + '</td>';
+                html += '<td><strong>R$ ' + (r.valorTotal || '0.00') + '</strong></td>';
+                html += '<td>' + (r.dataEmissao || '-') + '</td>';
+                html += '<td><button class="btn-delete" onclick="excluir(' + i + ')">🗑️</button></td>';
+                html += '</tr>';
+            }
+            tbody.innerHTML = html;
+        }
+
+        function excluir(index) {
+            if (confirm('Excluir este registro?')) {
+                registros.splice(index, 1);
+                localStorage.setItem('registros', JSON.stringify(registros));
+                atualizar();
+                notificar('Excluído!', 'info');
+            }
+        }
+
+        function exportarExcel() {
+            if (registros.length === 0) {
+                notificar('Nada para exportar!', 'error');
+                return;
+            }
+
+            var ws = XLSX.utils.json_to_sheet(registros);
+            var wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'NotasFiscais');
+            
+            var filename = 'NotasFiscais_' + new Date().toISOString().split('T')[0] + '.xlsx';
+            XLSX.writeFile(wb, filename);
+            
+            notificar('✅ Excel exportado!', 'success');
+        }
+
+        function exportarJSON() {
+            if (registros.length === 0) {
+                notificar('Nada para exportar!', 'error');
+                return;
+            }
+
+            var dataStr = JSON.stringify(registros, null, 2);
+            var dataBlob = new Blob([dataStr], {type: 'application/json'});
+            var url = URL.createObjectURL(dataBlob);
+            
+            var link = document.createElement('a');
+            link.href = url;
+            link.download = 'Backup_' + new Date().toISOString().split('T')[0] + '.json';
+            link.click();
+            
+            URL.revokeObjectURL(url);
+            notificar('✅ Backup criado!', 'success');
+        }
+
+        function notificar(msg, tipo) {
+            var n = document.createElement('div');
+            n.className = 'notification ' + tipo;
+            n.textContent = msg;
+            document.body.appendChild(n);
+            setTimeout(function() {
+                n.remove();
+            }, 3000);
+        }
+
+        window.onload = function() {
+            var dados = localStorage.getItem('registros');
+            if (dados) {
+                registros = JSON.parse(dados);
+                atualizar();
+            }
+        };
+
+        window.onbeforeunload = function() {
+            if (schedulerWorker) {
+                schedulerWorker.terminate();
+            }
+        };
+    </script>
+</body>
+</html>
